@@ -56,7 +56,7 @@ HoYo Gacha Center 是一個整合多款 miHoYo / HoYoverse 遊戲的抽卡紀錄
 未來規劃支援：
 
 * 匯入原作者工具輸出的 JSON
-* 匯入 UIGF / SRGF / ZZZGF 格式
+* 匯入 UIGF 格式
 * 自動合併不同來源資料
 * 根據唯一鍵去除重複紀錄
 
