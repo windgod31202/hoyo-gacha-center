@@ -6,8 +6,8 @@ HoYo Gacha Center 是一個整合多款 miHoYo / HoYoverse 遊戲的抽卡紀錄
 
 ## 作者
 
-* 整合與二次開發：Wei-Jay Chen / JayChen
-* GitHub：@jay0345678
+* 整合與二次開發：WindGod
+* GitHub：[WindGod](https://github.com/windgod31202)
 
 ## 專案定位
 
@@ -142,9 +142,9 @@ HoYo Gacha Center Setup 1.0.0-merged.exe
 
 本專案整合與參考了以下開源專案的架構與功能概念：
 
-* biuuu/genshin-wish-export
-* biuuu/star-rail-warp-export
-* earthjasonlin/zzz-signal-search-export
+* [biuuu/genshin-wish-export](https://github.com/biuuu/genshin-wish-export)
+* [biuuu/star-rail-warp-export](https://github.com/biuuu/star-rail-warp-export)
+* [earthjasonlin/zzz-signal-search-export](https://github.com/earthjasonlin/zzz-signal-search-export)
 
 感謝上述專案作者提供優秀的開源工具與實作基礎。
 
@@ -160,17 +160,14 @@ HoYo Gacha Center Setup 1.0.0-merged.exe
 
 ## 授權
 
-本專案保留原始開源專案之授權聲明與來源標註。
+本專案保留原始開源專案之來源標註。
 
 若本專案包含或修改自其他開源專案內容，請依原專案授權條款使用。
-整合與二次開發部分由 Wei-Jay Chen / JayChen 維護。
+整合與二次開發部分由 WindGod 維護。
 
 ## 未來規劃
 
 * 支援更多資料格式匯入
 * 支援跨工具資料融合與去重
 * 改善 UI / UX
-* 增加抽卡統計圖表
-* 增加多帳號資料管理
-* 增加 Android 版資料查看器
 * 研究更多遊戲的抽卡紀錄 API 支援可能性
