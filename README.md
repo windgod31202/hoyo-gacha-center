@@ -66,7 +66,7 @@ HoYo Gacha Center 是一個整合多款 miHoYo / HoYoverse 遊戲的抽卡紀錄
 
 * JSON
 * Excel
-* UIGF / SRGF / ZZZGF 格式，依後續版本實作狀況調整
+* UIGF 格式，依後續版本實作狀況調整
 
 ### 半自動更新模組
 
