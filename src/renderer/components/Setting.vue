@@ -1,8 +1,15 @@
 <template>
-  <div class="bg-white py-4 px-6 w-screen h-screen fixed inset-0 overflow-y-auto">
+  <div class="setting-overlay bg-white py-4 px-6 w-screen h-screen fixed inset-0 overflow-y-auto">
     <div class="flex content-center items-center mb-4 justify-between">
       <h3 class="text-lg">{{text.title}}</h3>
-      <el-button icon="close" @click="closeSetting" plain circle type="default" class="w-8 h-8 shadow-md focus:shadow-none focus:outline-none fixed top-4 right-6"></el-button>
+      <el-button
+        icon="close"
+        @click="closeSetting"
+        plain
+        circle
+        type="default"
+        class="setting-close-button w-8 h-8 shadow-md focus:shadow-none focus:outline-none fixed top-4 right-6"
+      />
     </div>
     <el-form :model="settingForm" label-width="120px">
       <el-form-item :label="text.language">
@@ -112,6 +119,96 @@
             上次檢查：{{ new Date(moduleUpdate.checkedAt).toLocaleString() }}
           </div>
 
+          <div v-if="moduleUpdate.app" class="app-update-card">
+            <div class="app-update-header">
+              <div>
+                <strong>HoYo Gacha Center 本體更新</strong>
+                <p>{{ moduleUpdate.app.repo }}</p>
+              </div>
+
+              <el-tag v-if="moduleUpdate.app.error" type="danger">檢查失敗</el-tag>
+              <el-tag v-else-if="moduleUpdate.app.updateAvailable" type="danger">有新版本</el-tag>
+              <el-tag v-else type="success">已是最新</el-tag>
+            </div>
+
+            <div class="app-update-versions">
+              <div>
+                <span>目前版本</span>
+                <strong>{{ moduleUpdate.app.currentVersion || '-' }}</strong>
+              </div>
+              <div>
+                <span>最新版本</span>
+                <strong>{{ moduleUpdate.app.latestVersion || '-' }}</strong>
+              </div>
+            </div>
+
+            <p v-if="moduleUpdate.app.releaseTitle" class="app-update-title">
+              {{ moduleUpdate.app.releaseTitle }}
+            </p>
+            <p v-if="moduleUpdate.app.error" class="module-update-error">
+              {{ moduleUpdate.app.error }}
+            </p>
+
+            <div class="app-update-actions">
+              <el-button
+                type="primary"
+                plain
+                :loading="moduleUpdate.autoUpdateStatus === 'checking'"
+                @click="checkAppAutoUpdate"
+              >
+                檢查本體更新
+              </el-button>
+
+              <el-button
+                v-if="moduleUpdate.app?.updateAvailable"
+                type="success"
+                plain
+                :loading="moduleUpdate.autoUpdating"
+                @click="oneClickAppUpdate"
+              >
+                一鍵下載更新
+              </el-button>
+
+              <el-button
+                v-if="moduleUpdate.autoUpdateStatus === 'available'"
+                type="success"
+                plain
+                :loading="moduleUpdate.autoUpdating"
+                @click="downloadAppUpdate"
+              >
+                下載更新
+              </el-button>
+
+              <el-button
+                v-if="moduleUpdate.autoDownloaded || moduleUpdate.autoUpdateStatus === 'downloaded'"
+                type="danger"
+                plain
+                @click="installAppUpdate"
+              >
+                立即重啟並安裝
+              </el-button>
+
+              <el-button
+                plain
+                :disabled="!moduleUpdate.app?.releaseUrl"
+                @click="openAppRelease"
+              >
+                開啟下載頁
+              </el-button>
+            </div>
+
+            <div v-if="moduleUpdate.autoUpdateMessage" class="app-auto-update-status">
+              <p>{{ moduleUpdate.autoUpdateMessage }}</p>
+
+              <el-progress
+                v-if="moduleUpdate.autoUpdateStatus === 'downloading'"
+                :percentage="moduleUpdate.autoUpdateProgress"
+              />
+            </div>
+          </div>
+
+          <el-empty v-if="moduleUpdate.checkedAt && !moduleUpdate.items.length" description="沒有上游模組資料" />
+
           <el-table v-if="moduleUpdate.items.length" :data="moduleUpdate.items" border size="small" class="module-update-table">
             <el-table-column prop="name" label="模組" min-width="150" />
             <el-table-column label="狀態" min-width="180">
@@ -210,7 +307,14 @@ const moduleUpdate = reactive({
   loading: false,
   applying: false,
   checkedAt: 0,
-  items: []
+  app: null,
+  items: [],
+
+  autoUpdateStatus: '',
+  autoUpdateMessage: '',
+  autoUpdateProgress: 0,
+  autoUpdating: false,
+  autoDownloaded: false
 })
 
 const uigf42 = reactive({
@@ -258,16 +362,94 @@ const checkModuleUpdates = async () => {
   moduleUpdate.loading = true
   try {
     const result = await ipcRenderer.invoke('MODULE_UPDATE_CHECK')
-    moduleUpdate.checkedAt = result.checkedAt
-    moduleUpdate.items = result.items || []
-    const count = moduleUpdate.items.filter(item => item.updateAvailable).length
-    if (count) ElMessage.warning(`發現 ${count} 個上游模組有新版本`)
-    else ElMessage.success('目前沒有未檢視的上游版本')
+
+    moduleUpdate.checkedAt = result.checkedAt || Date.now()
+    moduleUpdate.app = result.app || null
+    moduleUpdate.items = result.modules || result.items || []
+
+    const appHasUpdate = !!moduleUpdate.app?.updateAvailable
+    const moduleCount = moduleUpdate.items.filter(item => item.updateAvailable).length
+
+    if (appHasUpdate && moduleCount) {
+      ElMessage.warning(`發現 App 新版本，並有 ${moduleCount} 個上游模組可檢視`)
+    } else if (appHasUpdate) {
+      ElMessage.warning(`發現 HoYo Gacha Center 新版本：${moduleUpdate.app.latestVersion}`)
+    } else if (moduleCount) {
+      ElMessage.warning(`發現 ${moduleCount} 個上游模組有新版本`)
+    } else {
+      ElMessage.success('目前沒有可用更新')
+    }
+
+    console.log('MODULE_UPDATE_CHECK result:', result)
   } catch (e) {
     ElMessage.error(`檢查更新失敗：${e.message || e}`)
   } finally {
     moduleUpdate.loading = false
   }
+}
+
+const checkAppAutoUpdate = async () => {
+  moduleUpdate.autoUpdating = true
+  moduleUpdate.autoDownloaded = false
+  moduleUpdate.autoUpdateProgress = 0
+
+  try {
+    await ipcRenderer.invoke('APP_AUTO_UPDATE_CHECK')
+  } catch (e) {
+    ElMessage.error(`檢查 App 更新失敗：${e.message || e}`)
+  } finally {
+    moduleUpdate.autoUpdating = false
+  }
+}
+
+const downloadAppUpdate = async () => {
+  moduleUpdate.autoUpdating = true
+  moduleUpdate.autoDownloaded = false
+  moduleUpdate.autoUpdateProgress = 0
+
+  try {
+    await ipcRenderer.invoke('APP_AUTO_UPDATE_DOWNLOAD')
+  } catch (e) {
+    ElMessage.error(`下載 App 更新失敗：${e.message || e}`)
+    moduleUpdate.autoUpdating = false
+  }
+}
+
+const oneClickAppUpdate = async () => {
+  moduleUpdate.autoUpdating = true
+  moduleUpdate.autoDownloaded = false
+  moduleUpdate.autoUpdateProgress = 0
+
+  try {
+    await ipcRenderer.invoke('APP_AUTO_UPDATE_CHECK_AND_DOWNLOAD')
+  } catch (e) {
+    ElMessage.error(`一鍵更新失敗：${e.message || e}`)
+    moduleUpdate.autoUpdating = false
+  }
+}
+
+const installAppUpdate = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '程式將重新啟動並安裝新版，是否繼續？',
+      '安裝更新',
+      {
+        confirmButtonText: '立即安裝',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    await ipcRenderer.invoke('APP_AUTO_UPDATE_INSTALL')
+  } catch (e) {
+    if (e !== 'cancel') {
+      ElMessage.error(`安裝更新失敗：${e.message || e}`)
+    }
+  }
+}
+
+const openAppRelease = async () => {
+  await ipcRenderer.invoke('APP_UPDATE_OPEN_RELEASE')
 }
 
 const openModuleRelease = async (game) => {
@@ -362,6 +544,51 @@ const openUigfDictFolder = async () => {
 }
 
 onMounted(async () => {
+  ipcRenderer.on('APP_AUTO_UPDATE_STATUS', (event, payload) => {
+    moduleUpdate.autoUpdateStatus = payload.status
+    moduleUpdate.autoUpdateMessage = payload.message || ''
+
+    if (payload.progress) {
+      moduleUpdate.autoUpdateProgress = Math.round(payload.progress.percent || 0)
+    }
+
+    if (payload.status === 'checking') {
+      moduleUpdate.autoUpdating = true
+    }
+
+    if (payload.status === 'available') {
+      moduleUpdate.autoUpdating = false
+      moduleUpdate.autoDownloaded = false
+      ElMessage.warning(payload.message)
+    }
+
+    if (payload.status === 'not-available') {
+      moduleUpdate.autoUpdating = false
+      moduleUpdate.autoDownloaded = false
+      ElMessage.success(payload.message)
+    }
+
+    if (payload.status === 'downloading') {
+      moduleUpdate.autoUpdating = true
+    }
+
+    if (payload.status === 'downloaded') {
+      moduleUpdate.autoUpdating = false
+      moduleUpdate.autoDownloaded = true
+      ElMessage.success(payload.message)
+    }
+
+    if (payload.status === 'dev-mode') {
+      moduleUpdate.autoUpdating = false
+      ElMessage.warning(payload.message)
+    }
+
+    if (payload.status === 'error') {
+      moduleUpdate.autoUpdating = false
+      moduleUpdate.autoDownloaded = false
+      ElMessage.error(payload.message)
+    }
+  })
   data.langMap = await ipcRenderer.invoke('LANG_MAP')
   const config = await ipcRenderer.invoke('GET_CONFIG')
   Object.assign(settingForm, config)
@@ -454,5 +681,93 @@ onMounted(async () => {
   margin: 4px 0 0;
   color: #dc2626;
   font-size: 12px;
+}
+
+.app-update-card {
+  margin: 12px 0;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid #bfdbfe;
+  background: linear-gradient(135deg, #eff6ff, #f8fbff);
+}
+.app-update-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.app-update-header strong {
+  color: #1e3a8a;
+}
+.app-update-header p {
+  margin: 4px 0;
+  font-size: 12px;
+  color: #64748b;
+}
+.app-update-versions {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.app-update-versions div {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid #dbeafe;
+}
+.app-update-versions span {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+}
+.app-update-versions strong {
+  display: block;
+  margin-top: 4px;
+  color: #0f172a;
+  font-size: 14px;
+}
+.app-update-title {
+  margin: 10px 0 0;
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.app-update-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+.setting-overlay {
+  z-index: 9999;
+  background: #ffffff;
+}
+
+.setting-close-button {
+  z-index: 10050 !important;
+  pointer-events: auto;
+}
+
+.setting-overlay .el-form,
+.setting-overlay .el-dialog,
+.setting-overlay .el-table,
+.setting-overlay .el-card,
+.setting-overlay .module-update-panel,
+.setting-overlay .uigf42-panel {
+  position: relative;
+  z-index: 1;
+}
+.app-auto-update-status {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid #dbeafe;
+}
+
+.app-auto-update-status p {
+  margin: 0 0 8px;
+  color: #334155;
+  font-size: 13px;
 }
 </style>

@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain } = require('electron')
+const { registerAppUpdater } = require('./appUpdater')
 const { initWindow } = require('./utils')
 const { disableProxy, proxyStatus } = require('./module/system-proxy')
 require('./getData')
@@ -13,12 +14,17 @@ let win = null
 function createWindow() {
   win = initWindow()
   win.setMenuBarVisibility(false)
-  isDev ? win.loadURL(`http://localhost:${process.env.PORT}`) : win.loadFile('dist/electron/renderer/index.html')
+
+  registerAppUpdater(win)
+
+  isDev
+    ? win.loadURL(`http://localhost:${process.env.PORT}`)
+    : win.loadFile('dist/electron/renderer/index.html')
+
   if (isDev) {
     win.webContents.openDevTools({ mode: 'undocked', activate: true })
   }
 }
-
 const isFirstInstance = app.requestSingleInstanceLock()
 
 if (!isFirstInstance) {

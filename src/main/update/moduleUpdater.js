@@ -6,6 +6,14 @@ const semver = require('semver')
 const config = require('../config')
 const { appRoot, userDataPath, sendMsg } = require('../utils')
 
+const { version, name } = require('../../../package.json')
+
+const APP_UPDATE_SOURCE = {
+  name: 'HoYo Gacha Center',
+  repo: 'windgod31202/hoyo-gacha-center',
+  releaseUrl: 'https://github.com/windgod31202/hoyo-gacha-center/releases'
+}
+
 const SOURCES = {
   genshin: {
     game: 'genshin',
@@ -129,6 +137,43 @@ const getLatestRelease = async source => {
   }
 }
 
+const checkAppUpdate = async () => {
+  try {
+    const latest = await getLatestRelease(APP_UPDATE_SOURCE)
+
+    const currentVersion = toVersion(version)
+    const latestVersion = toVersion(latest.version)
+
+    const updateAvailable = latestVersion && currentVersion
+      ? semver.gt(latestVersion, currentVersion)
+      : latest.version !== version
+
+    return {
+      name: APP_UPDATE_SOURCE.name,
+      repo: APP_UPDATE_SOURCE.repo,
+      currentVersion: `v${version}`,
+      latestVersion: latest.version,
+      updateAvailable,
+      releaseTitle: latest.title,
+      releaseUrl: latest.url,
+      publishedAt: latest.publishedAt,
+      body: latest.body.slice(0, 1200),
+      mode: 'app-release'
+    }
+  } catch (e) {
+    return {
+      name: APP_UPDATE_SOURCE.name,
+      repo: APP_UPDATE_SOURCE.repo,
+      currentVersion: `v${version}`,
+      latestVersion: null,
+      updateAvailable: false,
+      error: e.message,
+      releaseUrl: APP_UPDATE_SOURCE.releaseUrl,
+      mode: 'app-release'
+    }
+  }
+}
+
 const checkModuleUpdates = async () => {
   const updateConfig = getUpdateConfig()
   const results = []
@@ -176,6 +221,17 @@ const checkModuleUpdates = async () => {
   updateConfig.checkedAt = Date.now()
   await saveUpdateConfig(updateConfig)
   return { checkedAt: updateConfig.checkedAt, items: results }
+}
+
+const checkAllUpdates = async () => {
+  const app = await checkAppUpdate()
+  const modules = await checkModuleUpdates()
+
+  return {
+    checkedAt: Date.now(),
+    app,
+    modules: modules.items
+  }
 }
 
 const createBackup = async game => {
@@ -244,7 +300,7 @@ const markModuleUpdateReviewed = async (game, version, releaseUrl = '') => {
   return updateConfig.games[game]
 }
 
-ipcMain.handle('MODULE_UPDATE_CHECK', checkModuleUpdates)
+ipcMain.handle('MODULE_UPDATE_CHECK', checkAllUpdates)
 ipcMain.handle('MODULE_UPDATE_APPLY_SAFE', async (event, game) => applySafeModuleUpdate(game))
 ipcMain.handle('MODULE_UPDATE_MARK_REVIEWED', async (event, game, version, releaseUrl) => markModuleUpdateReviewed(game, version, releaseUrl))
 ipcMain.handle('MODULE_UPDATE_BACKUP', async (event, game) => createBackup(game))
@@ -254,8 +310,14 @@ ipcMain.handle('MODULE_UPDATE_OPEN_RELEASE', async (event, game) => {
   await shell.openExternal(source.releaseUrl)
   return true
 })
+ipcMain.handle('APP_UPDATE_OPEN_RELEASE', async () => {
+  await shell.openExternal(APP_UPDATE_SOURCE.releaseUrl)
+  return true
+})
 
 module.exports = {
+  checkAppUpdate,
+  checkAllUpdates,
   checkModuleUpdates,
   applySafeModuleUpdate,
   markModuleUpdateReviewed,
