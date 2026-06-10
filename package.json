@@ -1,6 +1,6 @@
 {
   "name": "hoyo-gacha-center",
-  "version": "1.0.0-merged",
+  "version": "1.1.0",
   "main": "./dist/electron/main/main.js",
   "author": "WindGod <https://github.com/windgod31202>",
   "homepage": "https://github.com/biuuu/genshin-wish-export + https://github.com/biuuu/star-rail-warp-export",
