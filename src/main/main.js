@@ -5,6 +5,7 @@ require('./getData')
 require('./excel')
 const { getUpdateInfo } = require('./update/index')
 require('./update/moduleUpdater')
+require('./uigf42/service')
 
 const isDev = !app.isPackaged
 let win = null

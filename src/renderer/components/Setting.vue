@@ -23,6 +23,45 @@
         <el-button type="primary" plain @click="state.showDataDialog = true">{{common.dataManage}}</el-button>
         <p class="text-gray-400 text-xs m-1.5">{{text.dataManagerHint}}</p>
       </el-form-item>
+
+      <el-form-item label="UIGF v4.2">
+        <div class="uigf42-panel">
+          <div class="uigf42-header">
+            <div>
+              <strong>UIGF v4.2 匯入 / 匯出</strong>
+              <p>支援 UIGF v4.0 / v4.1 / v4.2 匯入，並預設匯出 v4.2。UIGF API 字典目前用於原神與星鐵的 item_id / 名稱標準化。</p>
+            </div>
+          </div>
+
+          <div class="uigf42-actions">
+            <el-button type="primary" plain :loading="uigf42.importing" @click="importUigfV42">匯入 UIGF JSON</el-button>
+            <el-button type="success" plain :loading="uigf42.exporting" @click="exportUigfV42">匯出 UIGF v4.2</el-button>
+            <el-button plain :loading="uigf42.updatingDict" @click="updateUigfDict">更新 UIGF 字典</el-button>
+            <el-button plain @click="openUigfDictFolder">開啟字典資料夾</el-button>
+          </div>
+
+          <el-alert
+            class="uigf42-alert"
+            type="info"
+            :closable="false"
+            title="UIGF API 不是抽卡抓取 API；這裡只用來更新原神 / 星鐵字典，協助補 item_id 與多語言名稱。"
+          />
+
+          <el-table v-if="uigf42.dictStatus.length" :data="uigf42.dictStatus" border size="small" class="uigf42-table">
+            <el-table-column prop="gameName" label="遊戲" min-width="120" />
+            <el-table-column label="狀態" min-width="170">
+              <template #default="scope">
+                <el-tag v-if="!scope.row.supported" type="info">API 字典暫不支援</el-tag>
+                <el-tag v-else-if="scope.row.exists" type="success">已下載</el-tag>
+                <el-tag v-else type="warning">尚未下載</el-tag>
+                <p class="uigf42-small">語言：{{ scope.row.lang || '-' }}</p>
+                <p class="uigf42-small">筆數：{{ scope.row.count || 0 }}</p>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </el-form-item>
+
       <el-form-item :label="text.autoUpdate">
         <el-switch
           @change="saveSetting"
@@ -104,7 +143,7 @@
     <h3 class="text-lg my-4">{{about.title}}</h3>
     <p class="text-gray-600 text-xs mt-1">{{text.idVersion}} {{idJson.version}}</p>
     <p class="text-gray-600 text-xs mt-1">{{about.license}}</p>
-    <p class="text-gray-600 text-xs mt-1">Github: <a @click="openGithub" class="cursor-pointer text-blue-400">https://github.com/biuuu/star-rail-warp-export</a></p>
+    <p class="text-gray-600 text-xs mt-1">Github: <a @click="openGithub" class="cursor-pointer text-blue-400">https://github.com/windgod31202/hoyo-gacha-center</a></p>
     <p class="text-gray-600 text-xs mt-1 pb-6">UIGF: <a @click="openUIGF" class="cursor-pointer text-blue-400">https://uigf.org/</a></p>
     <el-dialog v-model="state.showDataDialog" :title="common.dataManage" width="90%">
       <div class="">
@@ -174,6 +213,13 @@ const moduleUpdate = reactive({
   items: []
 })
 
+const uigf42 = reactive({
+  importing: false,
+  exporting: false,
+  updatingDict: false,
+  dictStatus: []
+})
+
 const common = computed(() => props.i18n.ui.common)
 const text = computed(() => props.i18n.ui.setting)
 const about = computed(() => props.i18n.ui.about)
@@ -196,7 +242,7 @@ const disableProxy = async () => {
   await ipcRenderer.invoke('DISABLE_PROXY')
 }
 
-const openGithub = () => shell.openExternal('https://github.com/biuuu/star-rail-warp-export')
+const openGithub = () => shell.openExternal('https://github.com/windgod31202/hoyo-gacha-center')
 const openUIGF = () => shell.openExternal('https://uigf.org/')
 const openLink = (link) => shell.openExternal(link)
 
@@ -253,10 +299,73 @@ const applySafeModuleUpdate = async (row) => {
   }
 }
 
+
+const refreshUigfDictStatus = async () => {
+  try {
+    uigf42.dictStatus = await ipcRenderer.invoke('UIGF_V42_DICT_STATUS', {
+      lang: settingForm.lang
+    })
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+const updateUigfDict = async () => {
+  uigf42.updatingDict = true
+  try {
+    const result = await ipcRenderer.invoke('UIGF_V42_UPDATE_DICT', {
+      lang: settingForm.lang,
+      games: ['genshin', 'starrail']
+    })
+    const updated = result.filter(item => item.updated).length
+    if (updated) ElMessage.success(`UIGF 字典更新完成：${updated} 個語言包已更新`)
+    else ElMessage.success('UIGF 字典已是最新')
+    await refreshUigfDictStatus()
+  } catch (e) {
+    ElMessage.error(`UIGF 字典更新失敗：${e.message || e}`)
+  } finally {
+    uigf42.updatingDict = false
+  }
+}
+
+const importUigfV42 = async () => {
+  uigf42.importing = true
+  try {
+    const result = await ipcRenderer.invoke('UIGF_V42_IMPORT')
+    if (result?.canceled) return
+    const unsupported = result.unsupported?.length ? `，略過：${result.unsupported.join('、')}` : ''
+    ElMessage.success(`已匯入 ${result.importedAccounts} 個帳號、${result.importedRecords} 筆紀錄${unsupported}`)
+    emit('refreshData')
+  } catch (e) {
+    ElMessage.error(`UIGF 匯入失敗：${e.message || e}`)
+  } finally {
+    uigf42.importing = false
+  }
+}
+
+const exportUigfV42 = async () => {
+  uigf42.exporting = true
+  try {
+    const result = await ipcRenderer.invoke('UIGF_V42_EXPORT')
+    if (result?.canceled) return
+    const counts = result.counts || {}
+    ElMessage.success(`已匯出 UIGF ${result.version}：原神 ${counts.hk4e || 0}、星鐵 ${counts.hkrpg || 0}、絕區零 ${counts.nap || 0} 筆`)
+  } catch (e) {
+    ElMessage.error(`UIGF 匯出失敗：${e.message || e}`)
+  } finally {
+    uigf42.exporting = false
+  }
+}
+
+const openUigfDictFolder = async () => {
+  await ipcRenderer.invoke('UIGF_V42_OPEN_DICT_FOLDER')
+}
+
 onMounted(async () => {
   data.langMap = await ipcRenderer.invoke('LANG_MAP')
   const config = await ipcRenderer.invoke('GET_CONFIG')
   Object.assign(settingForm, config)
+  await refreshUigfDictStatus()
 })
 
 </script>
@@ -273,6 +382,42 @@ onMounted(async () => {
 }
 .el-form-item--default {
   margin-bottom: 14px !important;
+}
+
+.uigf42-panel {
+  width: 100%;
+  max-width: 920px;
+  border: 1px solid #d1fae5;
+  border-radius: 14px;
+  padding: 14px;
+  background: linear-gradient(135deg, #f8fffb, #effdf5);
+}
+.uigf42-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.uigf42-header strong {
+  color: #064e3b;
+}
+.uigf42-header p,
+.uigf42-small {
+  margin: 4px 0;
+  font-size: 12px;
+  color: #64748b;
+}
+.uigf42-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.uigf42-alert {
+  margin: 12px 0;
+}
+.uigf42-table {
+  margin-top: 10px;
 }
 
 .module-update-panel {

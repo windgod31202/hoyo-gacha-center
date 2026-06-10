@@ -7,7 +7,11 @@ HoYo Gacha Center 是一個整合多款 miHoYo / HoYoverse 遊戲的抽卡紀錄
 ## 作者
 
 * 整合與二次開發：WindGod
+<<<<<<< HEAD
 * GitHub：[WindGod](https://github.com/windgod31202)
+=======
+* GitHub：[@windgod](https://github.com/windgod31202)
+>>>>>>> 89c325e (ADD UIGFv4.2 support & UI loading update)
 
 ## 專案定位
 
@@ -22,7 +26,7 @@ HoYo Gacha Center 是一個整合多款 miHoYo / HoYoverse 遊戲的抽卡紀錄
 * 本地抽卡紀錄保存
 * 抽卡統計與保底分析
 * Excel / JSON 匯出
-* 未來支援資料匯入、去重融合與半自動模組更新
+* 支援 UIGF json 格式資料匯入、去重融合與半自動模組更新
 
 ## 主要功能
 
@@ -53,6 +57,7 @@ HoYo Gacha Center 是一個整合多款 miHoYo / HoYoverse 遊戲的抽卡紀錄
 
 抽卡紀錄會保存在本機資料中，方便後續查詢、備份或匯出。
 
+<<<<<<< HEAD
 未來規劃支援：
 
 * 匯入原作者工具輸出的 JSON
@@ -60,13 +65,19 @@ HoYo Gacha Center 是一個整合多款 miHoYo / HoYoverse 遊戲的抽卡紀錄
 * 自動合併不同來源資料
 * 根據唯一鍵去除重複紀錄
 
+=======
+>>>>>>> 89c325e (ADD UIGFv4.2 support & UI loading update)
 ### 匯出功能
 
 支援將抽卡紀錄匯出成常見格式，例如：
 
 * JSON
 * Excel
+<<<<<<< HEAD
 * UIGF 格式，依後續版本實作狀況調整
+=======
+* UIGFv4.2 格式，依後續版本實作狀況調整
+>>>>>>> 89c325e (ADD UIGFv4.2 support & UI loading update)
 
 ### 半自動更新模組
 
@@ -160,7 +171,11 @@ HoYo Gacha Center Setup 1.0.0-merged.exe
 
 ## 授權
 
+<<<<<<< HEAD
 本專案保留原始開源專案之來源標註。
+=======
+本專案保留原始開源專案來源標註。
+>>>>>>> 89c325e (ADD UIGFv4.2 support & UI loading update)
 
 若本專案包含或修改自其他開源專案內容，請依原專案授權條款使用。
 整合與二次開發部分由 WindGod 維護。
@@ -171,3 +186,17 @@ HoYo Gacha Center Setup 1.0.0-merged.exe
 * 支援跨工具資料融合與去重
 * 改善 UI / UX
 * 研究更多遊戲的抽卡紀錄 API 支援可能性
+
+## UIGF v4.2 Support
+
+HoYo Gacha Center now includes a UIGF v4.2 compatibility layer.
+
+Supported data sections:
+
+- `hk4e` — Genshin Impact / 原神
+- `hkrpg` — Honkai: Star Rail / 崩壞：星穹鐵道
+- `nap` — Zenless Zone Zero / 絕區零
+
+The app can import UIGF v4.0 / v4.1 / v4.2 JSON files and exports UIGF v4.2 JSON by default.
+
+UIGF API integration is used as a dictionary and translation service for item names and item IDs. It is not used as a gacha history API. The public UIGF API dictionary currently supports Genshin Impact and Honkai: Star Rail, so Zenless Zone Zero dictionary updates are intentionally skipped until a matching public dictionary is available.
